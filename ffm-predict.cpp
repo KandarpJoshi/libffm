@@ -37,9 +37,11 @@ Option parse_option(int argc, char **argv) {
         throw invalid_argument("cannot parse argument");
 
     option.test_path = string(args[1]);
+    cout << option.test_path << endl;
     option.model_path = string(args[2]);
+    cout << option.model_path << endl;
     option.output_path = string(args[3]);
-
+    cout << option.output_path << endl;
     return option;
 }
 
@@ -81,6 +83,7 @@ void predict(string test_path, string model_path, string output_path) {
         loss -= y==1? log(y_bar) : log(1-y_bar);
 
         f_out << y_bar << "\n";
+        // f_out <<line << '\t' << y_bar << "\n";
     }
 
     loss /= i;

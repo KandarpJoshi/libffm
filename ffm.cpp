@@ -640,7 +640,17 @@ ffm_model ffm_train_on_disk(string tr_path, string va_path, ffm_parameter param)
     return model;
 }
 void ffm_save_txt(ffm_model &model , string path){
-    ofstream f_out(path, ios::out);
+//    printf("Hi called this function\n");
+    ofstream f_out;
+    f_out.open(path);
+//    printf("%s\n",reinterpret_cast<char*>(&model.n));
+//    cout << reinterpret_cast<char*>(&model.n) << endl;
+//    printf("%d\n",(ffm_int)(model.n));
+//    cout << (reinterpret_cast<char*>(&model.m)) << endl;
+//    printf("%d\n",(ffm_int)(model.m));
+//    printf("%d\n",(ffm_int)(model.k));
+//    printf("%d\n",(&model.k));
+//    f_out.write("start", sizeof(char)*5);
     f_out.write(reinterpret_cast<char*>(&model.n), sizeof(ffm_int));
     f_out.write(reinterpret_cast<char*>(&model.m), sizeof(ffm_int));
     f_out.write(reinterpret_cast<char*>(&model.k), sizeof(ffm_int));
@@ -650,12 +660,14 @@ void ffm_save_txt(ffm_model &model , string path){
     // f_out.write(reinterpret_cast<char*>(model.W), sizeof(ffm_float) * w_size);
     // Need to write chunk by chunk because some compiler use int32 and will overflow when w_size * 4 > MAX_INT
 
-    for(ffm_long offset = 0; offset < w_size; ) {
-        ffm_long next_offset = min(w_size, offset + (ffm_long) sizeof(ffm_float) * kCHUNK_SIZE);
-        ffm_long size = next_offset - offset;
-        f_out.write(reinterpret_cast<char*>(model.W+offset), sizeof(ffm_float) * size);
-        offset = next_offset;
-    }
+//    for(ffm_long offset = 0; offset < w_size; ) {
+//        ffm_long next_offset = min(w_size, offset + (ffm_long) sizeof(ffm_float) * kCHUNK_SIZE);
+//        ffm_long size = next_offset - offset;
+//        f_out.write(reinterpret_cast<char*>(model.W+offset), sizeof(ffm_float) * size);
+//        offset = next_offset;
+//    }
+//    f_out.write("end", sizeof(char)*3);
+    f_out.close();
 }
 void ffm_save_model(ffm_model &model, string path) {
     ofstream f_out(path, ios::out | ios::binary);
