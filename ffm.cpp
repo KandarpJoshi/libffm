@@ -56,15 +56,16 @@ ffm_int const kALIGNByte = 16;
 #else
 ffm_int const kALIGNByte = 4;
 #endif
-
+// will be 4 for SSE or 1
 ffm_int const kALIGN = kALIGNByte/sizeof(ffm_float);
 ffm_int const kCHUNK_SIZE = 10000000;
 ffm_int const kMaxLineSize = 100000;
-
+// no of bytes with aligned needed for k ffm_float
 inline ffm_int get_k_aligned(ffm_int k) {
     return (ffm_int) ceil((ffm_float)k / kALIGN) * kALIGN;
 }
-
+// get no of bytes to store one vector of latent varaible
+// and then return total size  = n (no_of_features) * m * (no_of_fields) * (no_of_bytes_of_onelatentvaraible_vector) *2
 ffm_long get_w_size(ffm_model &model) {
     ffm_int k_aligned = get_k_aligned(model.k);
     return (ffm_long) model.n * model.m * k_aligned * 2;
@@ -638,7 +639,24 @@ ffm_model ffm_train_on_disk(string tr_path, string va_path, ffm_parameter param)
 
     return model;
 }
+void ffm_save_txt(ffm_model &model , string path){
+    ofstream f_out(path, ios::out);
+    f_out.write(reinterpret_cast<char*>(&model.n), sizeof(ffm_int));
+    f_out.write(reinterpret_cast<char*>(&model.m), sizeof(ffm_int));
+    f_out.write(reinterpret_cast<char*>(&model.k), sizeof(ffm_int));
+    f_out.write(reinterpret_cast<char*>(&model.normalization), sizeof(bool));
 
+    ffm_long w_size = get_w_size(model);
+    // f_out.write(reinterpret_cast<char*>(model.W), sizeof(ffm_float) * w_size);
+    // Need to write chunk by chunk because some compiler use int32 and will overflow when w_size * 4 > MAX_INT
+
+    for(ffm_long offset = 0; offset < w_size; ) {
+        ffm_long next_offset = min(w_size, offset + (ffm_long) sizeof(ffm_float) * kCHUNK_SIZE);
+        ffm_long size = next_offset - offset;
+        f_out.write(reinterpret_cast<char*>(model.W+offset), sizeof(ffm_float) * size);
+        offset = next_offset;
+    }
+}
 void ffm_save_model(ffm_model &model, string path) {
     ofstream f_out(path, ios::out | ios::binary);
     f_out.write(reinterpret_cast<char*>(&model.n), sizeof(ffm_int));
