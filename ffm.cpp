@@ -186,7 +186,7 @@ inline ffm_float wTx(
     ffm_model &model, 
     ffm_float kappa=0, 
     ffm_float eta=0, 
-    ffm_float lambda=0, 
+    ffm_float lambda=0,
     bool do_update=false) {
 
     ffm_int align0 = 2 * get_k_aligned(model.k);
@@ -308,11 +308,13 @@ struct disk_problem_meta {
 
 struct problem_on_disk {
     disk_problem_meta meta;
+    ffm_int np;
     vector<ffm_float> Y;
     vector<ffm_float> R;
     vector<ffm_long> P;
     vector<ffm_node> X;
     vector<ffm_long> B;
+    vector<ffm_int> VP;
 
     problem_on_disk(string path) {
         f.open(path, ios::in | ios::binary);
@@ -344,6 +346,12 @@ struct problem_on_disk {
 
         X.resize(P[l]);
         f.read(reinterpret_cast<char*>(X.data()), sizeof(ffm_node) * P[l]);
+
+        f.read(reinterpret_cast<char *>(&np), sizeof(ffm_long));
+
+        VP.resize(np+1);
+        f.read(reinterpret_cast<char *>(VP.data()), sizeof(ffm_long) * (np+1));
+
 
         return l;
     }
@@ -403,6 +411,8 @@ void txt2bin(string txt_path, string bin_path) {
     vector<char> line(kMaxLineSize);
 
     ffm_long p = 0;
+    ffm_int vp = 0;
+    ffm_int np = 0;
     disk_problem_meta meta;
 
     vector<ffm_float> Y;
@@ -410,6 +420,7 @@ void txt2bin(string txt_path, string bin_path) {
     vector<ffm_long> P(1, 0);
     vector<ffm_node> X;
     vector<ffm_long> B;
+    vector<ffm_int> VP;
 
     auto write_chunk = [&] () {
         B.push_back(f_bin.tellp());
@@ -422,19 +433,35 @@ void txt2bin(string txt_path, string bin_path) {
         f_bin.write(reinterpret_cast<char*>(R.data()), sizeof(ffm_float) * l);
         f_bin.write(reinterpret_cast<char*>(P.data()), sizeof(ffm_long) * (l+1));
         f_bin.write(reinterpret_cast<char*>(X.data()), sizeof(ffm_node) * nnz);
+        f_bin.write(reinterpret_cast<char*>(&np), sizeof(ffm_int));
+        f_bin.write(reinterpret_cast<char*>(VP.data()), sizeof(ffm_int) * (np + 1));
 
         Y.clear();
         R.clear();
         P.assign(1, 0);
+        VP.clear();
         X.clear();
         p = 0;
+        np = 0;
+        vp = 0;
         meta.num_blocks++;
     };
 
     f_bin.write(reinterpret_cast<char*>(&meta), sizeof(disk_problem_meta));
-
+    ffm_long previous_visit = -1;
     while(fgets(line.data(), kMaxLineSize, f_txt)) {
-        char *y_char = strtok(line.data(), " \t");
+        char *visit = strtok(line.data(),"^");
+
+        ffm_long current_visit = atol(visit);
+
+        if(current_visit != previous_visit){
+            if(X.size() > (size_t)kCHUNK_SIZE)
+                write_chunk();
+            np++;
+            VP.push_back(vp);
+        }
+        previous_visit = current_visit;
+        char *y_char = strtok(nullptr, " \t");
 
         ffm_float y = (atoi(y_char)>0)? 1.0f : -1.0f;
 
@@ -464,9 +491,11 @@ void txt2bin(string txt_path, string bin_path) {
         R.push_back(scale);
         P.push_back(p);
 
-        if(X.size() > (size_t)kCHUNK_SIZE)
-            write_chunk(); 
+
+
+        vp++;
     }
+    VP.push_back(vp+1);
     write_chunk(); 
     write_chunk(); // write a dummy empty chunk in order to know where the EOF is
     assert(meta.num_blocks == (ffm_int)B.size());
@@ -569,37 +598,102 @@ ffm_model ffm_train_on_disk(string tr_path, string va_path, ffm_parameter param)
         random_shuffle(outer_order.begin(), outer_order.end());
         for(auto blk : outer_order) {
             ffm_int l = prob.load_block(blk);
-
-            vector<ffm_int> inner_order(l);
+            ffm_int np = prob.np;
+            vector<ffm_int> inner_order(np);
             iota(inner_order.begin(), inner_order.end(), 0);
             random_shuffle(inner_order.begin(), inner_order.end());
 
 #if defined USEOMP
 #pragma omp parallel for schedule(static) reduction(+: loss)
 #endif
-            for(ffm_int ii = 0; ii < l; ii++) {
+            for(ffm_int ii = 0; ii < np; ii++) {
+
+//                ffm_int i = inner_order[ii];
+//
+//                ffm_float y = prob.Y[i];
+//
+//                ffm_node *begin = &prob.X[prob.P[i]];
+//
+//                ffm_node *end = &prob.X[prob.P[i+1]];
+//
+//                ffm_float r = param.normalization? prob.R[i] : 1;
+//
+//                ffm_double t = wTx(begin, end, r, model);
+//
+//                ffm_double expnyt = exp(-y*t);
+//
+//                loss += log1p(expnyt);
+//
+//                if(do_update) {
+//
+//                    ffm_float kappa = -y*expnyt/(1+expnyt);
+//
+//                    wTx(begin, end, r, model, kappa, param.eta, param.lambda, true);
+//                }
+                //printf("HI");
                 ffm_int i = inner_order[ii];
+                ffm_int start = prob.VP.at(i);
+                ffm_int end = prob.VP.at(i+1);
+//                vector<ffm_float> lambda;
+//                vector<ffm_float> s;
+//                for(ffm_int j = start; j<end; j++){
+//                    ffm_node *begin = &prob.X[prob.P[j]];
+//                    ffm_node *end = &prob.X[prob.P[j+1]];
+//                    ffm_float r = param.normalization? prob.R[i] : 1;
+//                    s.push_back(wTx(begin,end,r,model));
+//                    lambda.push_back(0);
+//                }
+//                printf("called\n");
+//                for(int x =start; x <end;x++ ){
+//                    printf("%f",s[x - start]);
+//                }
+                //cout << s <<endl;
+                for(ffm_int j = start ; j<end; j++){
+                    ffm_float yj = prob.Y[j];
+                    if(yj<=0){
+                        break;
+                    }
+                    for(ffm_int k = j+1 ;k < end ;k++){
+                        ffm_float  yk = prob.Y[k];
+                        if(yj == yk && yj<=0){
+                            continue;
+                        }
+                        if(yj > yk){
+                            ffm_node *begin = &prob.X[prob.P[j]];
+                            ffm_node *end = &prob.X[prob.P[j+1]];
+                            ffm_float r = param.normalization? prob.R[j] : 1;
+                            ffm_node *begin2 = &prob.X[prob.P[k]];
+                            ffm_node *end2 = &prob.X[prob.P[k+1]];
+                            ffm_float r2 = param.normalization? prob.R[k] : 1;
+                            ffm_float  sj = wTx(begin,end,r,model);
+                            ffm_float  sk = wTx(begin2,end2,r2,model);
+                            ffm_float lambdajk = - param.sigma /(1 + exp(param.sigma * (sj-sk)));
+//                            lambda[j] += lambdajk;
+//                            lambda[k] -= lambdajk;
+                            if(do_update){
 
-                ffm_float y = prob.Y[i];
-                
-                ffm_node *begin = &prob.X[prob.P[i]];
+                                ffm_float kappa = lambdajk;
+                                wTx(begin,end,r,model,kappa,param.eta,param.lambda,true);
 
-                ffm_node *end = &prob.X[prob.P[i+1]];
 
-                ffm_float r = param.normalization? prob.R[i] : 1;
+                                wTx(begin2,end2,r2,model,kappa,param.eta,param.lambda,true);
 
-                ffm_double t = wTx(begin, end, r, model);
+                            }
+                            loss += log1p(exp(-1 * param.sigma * (sj - sk)));
+                        }
 
-                ffm_double expnyt = exp(-y*t);
-
-                loss += log1p(expnyt);
-
-                if(do_update) {
-                   
-                    ffm_float kappa = -y*expnyt/(1+expnyt);
-
-                    wTx(begin, end, r, model, kappa, param.eta, param.lambda, true);
+                    }
                 }
+//                if(do_update){
+//                    for(ffm_int j = start ;j<end;j++){
+//                        ffm_node *begin = &prob.X[prob.P[j]];
+//                        ffm_node *end = &prob.X[prob.P[j+1]];
+//                        ffm_float r = param.normalization? prob.R[i] : 1;
+//
+//                        ffm_float kappa = lambda[j];
+//                        wTx(begin,end,r,model,kappa,param.eta,param.lambda,true);
+//                    }
+//                }
             }
         }
 

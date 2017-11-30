@@ -13,6 +13,7 @@ typedef int ffm_int;
 typedef long long ffm_long;
 
 struct ffm_node {
+    ffm_int pid; // player id
     ffm_int f; // field index
     ffm_int j; // feature index
     ffm_float v; // value
@@ -31,6 +32,7 @@ struct ffm_parameter {
     ffm_float eta = 0.2; // learning rate
     ffm_float lambda = 0.00002; // regularization parameter
     ffm_int nr_iters = 15;
+    ffm_float sigma = 0.5;
     ffm_int k = 4; // number of latent factors
     bool normalization = true;
     bool auto_stop = false;
