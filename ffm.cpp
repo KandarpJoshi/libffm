@@ -292,7 +292,7 @@ ffm_model init_model(ffm_int n, ffm_int m, ffm_parameter param)
             }
         }
     }
-
+    cout << "initialized" << endl;
     return model;
 }
 
@@ -347,12 +347,12 @@ struct problem_on_disk {
         X.resize(P[l]);
         f.read(reinterpret_cast<char*>(X.data()), sizeof(ffm_node) * P[l]);
 
-        f.read(reinterpret_cast<char *>(&np), sizeof(ffm_long));
+        f.read(reinterpret_cast<char *>(&np), sizeof(ffm_int));
 
         VP.resize(np+1);
-        f.read(reinterpret_cast<char *>(VP.data()), sizeof(ffm_long) * (np+1));
+        f.read(reinterpret_cast<char *>(VP.data()), sizeof(ffm_int) * (np+1));
 
-
+       //cout << "loading completed" << endl;
         return l;
     }
 
@@ -450,6 +450,7 @@ void txt2bin(string txt_path, string bin_path) {
     f_bin.write(reinterpret_cast<char*>(&meta), sizeof(disk_problem_meta));
     ffm_long previous_visit = -1;
     while(fgets(line.data(), kMaxLineSize, f_txt)) {
+       // cout << line.data();
         char *visit = strtok(line.data(),"^");
 
         ffm_long current_visit = atol(visit);
@@ -462,7 +463,7 @@ void txt2bin(string txt_path, string bin_path) {
         }
         previous_visit = current_visit;
         char *y_char = strtok(nullptr, " \t");
-
+       // cout << y_char << endl;
         ffm_float y = (atoi(y_char)>0)? 1.0f : -1.0f;
 
         ffm_float scale = 0;
@@ -477,7 +478,7 @@ void txt2bin(string txt_path, string bin_path) {
             N.f = atoi(field_char);
             N.j = atoi(idx_char);
             N.v = atof(value_char);
-
+            //cout << field_char << endl;
             X.push_back(N);
 
             meta.m = max(meta.m, N.f+1);
@@ -495,7 +496,7 @@ void txt2bin(string txt_path, string bin_path) {
 
         vp++;
     }
-    VP.push_back(vp+1);
+    VP.push_back(vp);
     write_chunk(); 
     write_chunk(); // write a dummy empty chunk in order to know where the EOF is
     assert(meta.num_blocks == (ffm_int)B.size());
@@ -598,15 +599,23 @@ ffm_model ffm_train_on_disk(string tr_path, string va_path, ffm_parameter param)
         random_shuffle(outer_order.begin(), outer_order.end());
         for(auto blk : outer_order) {
             ffm_int l = prob.load_block(blk);
+         //   cout << "l " << l <<endl;
             ffm_int np = prob.np;
+         //   cout<<"np "<<np<<endl;
             vector<ffm_int> inner_order(np);
             iota(inner_order.begin(), inner_order.end(), 0);
             random_shuffle(inner_order.begin(), inner_order.end());
-
+//            for(int i=0;i<np;i++){
+//                cout << i << " ";
+//                cout << inner_order[i] <<endl;
+//            }
+//            cout << "ended"<<endl;
 #if defined USEOMP
 #pragma omp parallel for schedule(static) reduction(+: loss)
 #endif
+
             for(ffm_int ii = 0; ii < np; ii++) {
+             //   cout<<"entered"<<endl;
 
 //                ffm_int i = inner_order[ii];
 //
@@ -632,8 +641,11 @@ ffm_model ffm_train_on_disk(string tr_path, string va_path, ffm_parameter param)
 //                }
                 //printf("HI");
                 ffm_int i = inner_order[ii];
-                ffm_int start = prob.VP.at(i);
-                ffm_int end = prob.VP.at(i+1);
+        //        cout <<"index "<< i << endl;
+                ffm_int start = prob.VP[i];
+          //      cout <<"start "<< start << endl;
+                ffm_int end = prob.VP[i+1];
+            //   cout <<"end "<< end << endl;
 //                vector<ffm_float> lambda;
 //                vector<ffm_float> s;
 //                for(ffm_int j = start; j<end; j++){
@@ -655,7 +667,9 @@ ffm_model ffm_train_on_disk(string tr_path, string va_path, ffm_parameter param)
                     }
                     for(ffm_int k = j+1 ;k < end ;k++){
                         ffm_float  yk = prob.Y[k];
-                        if(yj == yk && yj<=0){
+                        //
+                        //cout <<yj<<" "<< yk<<" "<<k<< " "<<end<<endl;
+                        if(yj <= yk){
                             continue;
                         }
                         if(yj > yk){
@@ -665,9 +679,28 @@ ffm_model ffm_train_on_disk(string tr_path, string va_path, ffm_parameter param)
                             ffm_node *begin2 = &prob.X[prob.P[k]];
                             ffm_node *end2 = &prob.X[prob.P[k+1]];
                             ffm_float r2 = param.normalization? prob.R[k] : 1;
+//                            for(ffm_node *current = begin ; current!=end ;current++){
+//                                cout << "f " << current->f <<endl;
+//                                cout << "j "<< current->j << endl;
+//                                cout << "v "<< current->v << endl;
+//                            }
+//                            cout<<"ended "<<endl;
                             ffm_float  sj = wTx(begin,end,r,model);
+//                            ffm_int z =0;
+//                            for(ffm_node *current = begin2 ; current!=end2 ;current++){
+//                                cout << "f2 " << current->f <<endl;
+//                                cout << "j2 "<< current->j << endl;
+//                                cout << "v2 "<< current->v << endl;
+//                                z++;
+//                                if(z > 15){
+//                                    cout << "bc" << endl;
+//                                    break;
+//                                }
+//
+//                            }
                             ffm_float  sk = wTx(begin2,end2,r2,model);
                             ffm_float lambdajk = - param.sigma /(1 + exp(param.sigma * (sj-sk)));
+                      //      cout << "calculated" << endl;
 //                            lambda[j] += lambdajk;
 //                            lambda[k] -= lambdajk;
                             if(do_update){
@@ -679,6 +712,8 @@ ffm_model ffm_train_on_disk(string tr_path, string va_path, ffm_parameter param)
                                 wTx(begin2,end2,r2,model,kappa,param.eta,param.lambda,true);
 
                             }
+//                            cout<<"sj "<<sj<<" sk "<<sk<<endl;
+//                            cout<<"exp "<<exp(-1 * param.sigma * (sj - sk))<<endl;
                             loss += log1p(exp(-1 * param.sigma * (sj - sk)));
                         }
 
@@ -696,7 +731,7 @@ ffm_model ffm_train_on_disk(string tr_path, string va_path, ffm_parameter param)
 //                }
             }
         }
-
+       // cout << total<<endl;
         return loss / prob.meta.l;
     };
 
