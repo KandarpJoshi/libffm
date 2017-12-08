@@ -455,9 +455,11 @@ void txt2bin(string txt_path, string bin_path) {
 
         ffm_long current_visit = atol(visit);
 
-        if(current_visit != previous_visit){
-            if(X.size() > (size_t)kCHUNK_SIZE)
+        if(current_visit != previous_visit) {
+            if (X.size() > (size_t) kCHUNK_SIZE) {
+                VP.push_back(vp);
                 write_chunk();
+            }
             np++;
             VP.push_back(vp);
         }
@@ -497,6 +499,8 @@ void txt2bin(string txt_path, string bin_path) {
         vp++;
     }
     VP.push_back(vp);
+    //cout <<"np "<<np <<endl;
+    //cout<<"size of vp"<<VP.size()<<endl;
     write_chunk(); 
     write_chunk(); // write a dummy empty chunk in order to know where the EOF is
     assert(meta.num_blocks == (ffm_int)B.size());
@@ -593,7 +597,7 @@ ffm_model ffm_train_on_disk(string tr_path, string va_path, ffm_parameter param)
     auto one_epoch = [&] (problem_on_disk &prob, bool do_update) {
 
         ffm_double loss = 0;
-
+        ffm_int competition_count = 0;
         vector<ffm_int> outer_order(prob.meta.num_blocks);
         iota(outer_order.begin(), outer_order.end(), 0);
         random_shuffle(outer_order.begin(), outer_order.end());
@@ -610,10 +614,13 @@ ffm_model ffm_train_on_disk(string tr_path, string va_path, ffm_parameter param)
 //                cout << inner_order[i] <<endl;
 //            }
 //            cout << "ended"<<endl;
+      //      cout<<"np " <<np<<endl;
+       //     cout<<"size"<< prob.VP.size() << endl;
+         //     omp_set_num_threads(16);
 #if defined USEOMP
-#pragma omp parallel for schedule(static) reduction(+: loss)
+#pragma omp parallel for schedule(static) reduction(+: loss,competition_count)
+//omp_set_num_threads(16);
 #endif
-
             for(ffm_int ii = 0; ii < np; ii++) {
              //   cout<<"entered"<<endl;
 
@@ -709,12 +716,13 @@ ffm_model ffm_train_on_disk(string tr_path, string va_path, ffm_parameter param)
                                 wTx(begin,end,r,model,kappa,param.eta,param.lambda,true);
 
 
-                                wTx(begin2,end2,r2,model,kappa,param.eta,param.lambda,true);
+                                wTx(begin2,end2,r2,model,-1*kappa,param.eta,param.lambda,true);
 
                             }
 //                            cout<<"sj "<<sj<<" sk "<<sk<<endl;
 //                            cout<<"exp "<<exp(-1 * param.sigma * (sj - sk))<<endl;
                             loss += log1p(exp(-1 * param.sigma * (sj - sk)));
+                            competition_count ++;
                         }
 
                     }
@@ -732,7 +740,7 @@ ffm_model ffm_train_on_disk(string tr_path, string va_path, ffm_parameter param)
             }
         }
        // cout << total<<endl;
-        return loss / prob.meta.l;
+        return loss / competition_count;
     };
 
     for(ffm_int iter = 1; iter <= param.nr_iters; iter++) {
@@ -852,7 +860,8 @@ ffm_float ffm_predict(ffm_node *begin, ffm_node *end, ffm_model &model) {
 
     ffm_float t = wTx(begin, end, r, model);
 
-    return 1/(1+exp(-t));
+    return t;
 }
 
 } // namespace ffm
+

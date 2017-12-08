@@ -60,8 +60,11 @@ void predict(string test_path, string model_path, string output_path) {
 
     for(; fgets(line, kMaxLineSize, f_in) != nullptr; i++) {
         f_out << line;
-        x.clear();
-        char *y_char = strtok(line, " \t");
+        //printf("%s\n",line);
+        char *features = strtok(line,"^");
+	//printf("%s\n",features);
+	x.clear();
+        char *y_char = strtok(features, " \t");
         ffm_float y = (atoi(y_char)>0)? 1.0f : -1.0f;
 
         while(true) {
@@ -81,7 +84,7 @@ void predict(string test_path, string model_path, string output_path) {
 
         ffm_float y_bar = ffm_predict(x.data(), x.data()+x.size(), model);
 
-        loss -= y==1? log(y_bar) : log(1-y_bar);
+        //loss -= y==1? log(y_bar) : log(1-y_bar);
 
         f_out << y_bar << "\n";
         // f_out <<line << '\t' << y_bar << "\n";

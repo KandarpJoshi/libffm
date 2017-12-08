@@ -164,6 +164,7 @@ int main(int argc, char **argv) {
     }
 
 #if defined USEOMP
+    cout <<"threads "<< opt.nr_threads <<endl;
     omp_set_num_threads(opt.nr_threads);
 #endif
 
