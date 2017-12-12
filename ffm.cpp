@@ -315,6 +315,7 @@ struct problem_on_disk {
     vector<ffm_node> X;
     vector<ffm_long> B;
     vector<ffm_int> VP;
+    vector<ffm_float> WE;
 
     problem_on_disk(string path) {
         f.open(path, ios::in | ios::binary);
@@ -351,6 +352,9 @@ struct problem_on_disk {
 
         VP.resize(np+1);
         f.read(reinterpret_cast<char *>(VP.data()), sizeof(ffm_int) * (np+1));
+
+        WE.resize(l);
+        f.read(reinterpret_cast<char*>(WE.data()), sizeof(ffm_float) * l);
 
        //cout << "loading completed" << endl;
         return l;
@@ -416,6 +420,7 @@ void txt2bin(string txt_path, string bin_path) {
     disk_problem_meta meta;
 
     vector<ffm_float> Y;
+    vector<ffm_float> WE;
     vector<ffm_float> R;
     vector<ffm_long> P(1, 0);
     vector<ffm_node> X;
@@ -435,12 +440,15 @@ void txt2bin(string txt_path, string bin_path) {
         f_bin.write(reinterpret_cast<char*>(X.data()), sizeof(ffm_node) * nnz);
         f_bin.write(reinterpret_cast<char*>(&np), sizeof(ffm_int));
         f_bin.write(reinterpret_cast<char*>(VP.data()), sizeof(ffm_int) * (np + 1));
+        f_bin.write(reinterpret_cast<char*>(WE.data()), sizeof(ffm_float) * (l));
 
         Y.clear();
         R.clear();
         P.assign(1, 0);
         VP.clear();
         X.clear();
+        WE.clear();
+
         p = 0;
         np = 0;
         vp = 0;
@@ -464,6 +472,8 @@ void txt2bin(string txt_path, string bin_path) {
             VP.push_back(vp);
         }
         previous_visit = current_visit;
+        char *weight = strtok(nullptr,"^");
+
         char *y_char = strtok(nullptr, " \t");
        // cout << y_char << endl;
         ffm_float y = (atoi(y_char)>0)? 1.0f : -1.0f;
@@ -489,7 +499,7 @@ void txt2bin(string txt_path, string bin_path) {
             scale += N.v*N.v;
         }
         scale = 1.0 / scale;
-
+        WE.push_back(atof(weight));
         Y.push_back(y);
         R.push_back(scale);
         P.push_back(p);
@@ -597,7 +607,8 @@ ffm_model ffm_train_on_disk(string tr_path, string va_path, ffm_parameter param)
     auto one_epoch = [&] (problem_on_disk &prob, bool do_update) {
 
         ffm_double loss = 0;
-        ffm_int competition_count = 0;
+        ffm_double competition_count = 0;
+        ffm_double accuracy = 0;
         vector<ffm_int> outer_order(prob.meta.num_blocks);
         iota(outer_order.begin(), outer_order.end(), 0);
         random_shuffle(outer_order.begin(), outer_order.end());
@@ -618,7 +629,7 @@ ffm_model ffm_train_on_disk(string tr_path, string va_path, ffm_parameter param)
        //     cout<<"size"<< prob.VP.size() << endl;
          //     omp_set_num_threads(16);
 #if defined USEOMP
-#pragma omp parallel for schedule(static) reduction(+: loss,competition_count)
+#pragma omp parallel for schedule(static) reduction(+: loss,competition_count,accuracy)
 //omp_set_num_threads(16);
 #endif
             for(ffm_int ii = 0; ii < np; ii++) {
@@ -646,36 +657,21 @@ ffm_model ffm_train_on_disk(string tr_path, string va_path, ffm_parameter param)
 //
 //                    wTx(begin, end, r, model, kappa, param.eta, param.lambda, true);
 //                }
-                //printf("HI");
                 ffm_int i = inner_order[ii];
-        //        cout <<"index "<< i << endl;
                 ffm_int start = prob.VP[i];
-          //      cout <<"start "<< start << endl;
                 ffm_int end = prob.VP[i+1];
-            //   cout <<"end "<< end << endl;
-//                vector<ffm_float> lambda;
-//                vector<ffm_float> s;
-//                for(ffm_int j = start; j<end; j++){
-//                    ffm_node *begin = &prob.X[prob.P[j]];
-//                    ffm_node *end = &prob.X[prob.P[j+1]];
-//                    ffm_float r = param.normalization? prob.R[i] : 1;
-//                    s.push_back(wTx(begin,end,r,model));
-//                    lambda.push_back(0);
-//                }
-//                printf("called\n");
-//                for(int x =start; x <end;x++ ){
-//                    printf("%f",s[x - start]);
-//                }
-                //cout << s <<endl;
+
                 for(ffm_int j = start ; j<end; j++){
                     ffm_float yj = prob.Y[j];
+                    ffm_float  weight  = prob.WE[j];
                     if(yj<=0){
                         break;
                     }
                     for(ffm_int k = j+1 ;k < end ;k++){
+
                         ffm_float  yk = prob.Y[k];
-                        //
-                        //cout <<yj<<" "<< yk<<" "<<k<< " "<<end<<endl;
+
+
                         if(yj <= yk){
                             continue;
                         }
@@ -683,63 +679,37 @@ ffm_model ffm_train_on_disk(string tr_path, string va_path, ffm_parameter param)
                             ffm_node *begin = &prob.X[prob.P[j]];
                             ffm_node *end = &prob.X[prob.P[j+1]];
                             ffm_float r = param.normalization? prob.R[j] : 1;
+
                             ffm_node *begin2 = &prob.X[prob.P[k]];
                             ffm_node *end2 = &prob.X[prob.P[k+1]];
                             ffm_float r2 = param.normalization? prob.R[k] : 1;
-//                            for(ffm_node *current = begin ; current!=end ;current++){
-//                                cout << "f " << current->f <<endl;
-//                                cout << "j "<< current->j << endl;
-//                                cout << "v "<< current->v << endl;
-//                            }
-//                            cout<<"ended "<<endl;
+
                             ffm_float  sj = wTx(begin,end,r,model);
-//                            ffm_int z =0;
-//                            for(ffm_node *current = begin2 ; current!=end2 ;current++){
-//                                cout << "f2 " << current->f <<endl;
-//                                cout << "j2 "<< current->j << endl;
-//                                cout << "v2 "<< current->v << endl;
-//                                z++;
-//                                if(z > 15){
-//                                    cout << "bc" << endl;
-//                                    break;
-//                                }
-//
-//                            }
                             ffm_float  sk = wTx(begin2,end2,r2,model);
                             ffm_float lambdajk = - param.sigma /(1 + exp(param.sigma * (sj-sk)));
-                      //      cout << "calculated" << endl;
-//                            lambda[j] += lambdajk;
-//                            lambda[k] -= lambdajk;
+
+                            if(sj > sk){
+                                accuracy+=weight;
+                            }
+
                             if(do_update){
 
-                                ffm_float kappa = lambdajk;
+                                ffm_float kappa = weight * lambdajk;
                                 wTx(begin,end,r,model,kappa,param.eta,param.lambda,true);
-
 
                                 wTx(begin2,end2,r2,model,-1*kappa,param.eta,param.lambda,true);
 
                             }
-//                            cout<<"sj "<<sj<<" sk "<<sk<<endl;
-//                            cout<<"exp "<<exp(-1 * param.sigma * (sj - sk))<<endl;
-                            loss += log1p(exp(-1 * param.sigma * (sj - sk)));
-                            competition_count ++;
+                            loss += weight * log1p(exp(-1 * param.sigma * (sj - sk)));
+                            competition_count += weight;
                         }
 
                     }
                 }
-//                if(do_update){
-//                    for(ffm_int j = start ;j<end;j++){
-//                        ffm_node *begin = &prob.X[prob.P[j]];
-//                        ffm_node *end = &prob.X[prob.P[j+1]];
-//                        ffm_float r = param.normalization? prob.R[i] : 1;
-//
-//                        ffm_float kappa = lambda[j];
-//                        wTx(begin,end,r,model,kappa,param.eta,param.lambda,true);
-//                    }
-//                }
             }
         }
        // cout << total<<endl;
+        cout<<" accuracy "<< (accuracy)/competition_count<<endl;
         return loss / competition_count;
     };
 
