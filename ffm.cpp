@@ -476,7 +476,7 @@ void txt2bin(string txt_path, string bin_path) {
 
         char *y_char = strtok(nullptr, " \t");
        // cout << y_char << endl;
-        ffm_float y = (atoi(y_char)>0)? 1.0f : -1.0f;
+        ffm_float y = atoi(y_char);
 
         ffm_float scale = 0;
         for(; ; p++) {
@@ -664,28 +664,41 @@ ffm_model ffm_train_on_disk(string tr_path, string va_path, ffm_parameter param)
                 for(ffm_int j = start ; j<end; j++){
                     ffm_float yj = prob.Y[j];
                     ffm_float  weight  = prob.WE[j];
-                    if(yj<=0){
-                        break;
-                    }
+//                    if(yj<=0){
+//                        break;
+//                    }
                     for(ffm_int k = j+1 ;k < end ;k++){
 
                         ffm_float  yk = prob.Y[k];
 
 
-                        if(yj <= yk){
+                        if(yj < yk){
                             continue;
                         }
+                        ffm_node *begin = &prob.X[prob.P[j]];
+                        ffm_node *end = &prob.X[prob.P[j+1]];
+                        ffm_float r = param.normalization? prob.R[j] : 1;
+
+                        ffm_node *begin2 = &prob.X[prob.P[k]];
+                        ffm_node *end2 = &prob.X[prob.P[k+1]];
+                        ffm_float r2 = param.normalization? prob.R[k] : 1;
+
+                        ffm_float  sj = wTx(begin,end,r,model);
+                        ffm_float  sk = wTx(begin2,end2,r2,model);
+
+                        if(yj == yk){
+                            ffm_float lambdajk = param.sigma * ((1.0/2) - (1.0 / (1 + exp(param.sigma * (sj-sk)))));
+                            if(do_update){
+
+                                ffm_float kappa = weight * lambdajk;
+                                wTx(begin,end,r,model,kappa,param.eta,param.lambda,true);
+
+                                wTx(begin2,end2,r2,model,-1*kappa,param.eta,param.lambda,true);
+
+                            }
+                        }
                         if(yj > yk){
-                            ffm_node *begin = &prob.X[prob.P[j]];
-                            ffm_node *end = &prob.X[prob.P[j+1]];
-                            ffm_float r = param.normalization? prob.R[j] : 1;
 
-                            ffm_node *begin2 = &prob.X[prob.P[k]];
-                            ffm_node *end2 = &prob.X[prob.P[k+1]];
-                            ffm_float r2 = param.normalization? prob.R[k] : 1;
-
-                            ffm_float  sj = wTx(begin,end,r,model);
-                            ffm_float  sk = wTx(begin2,end2,r2,model);
                             ffm_float lambdajk = - param.sigma /(1 + exp(param.sigma * (sj-sk)));
 
                             if(sj > sk){
