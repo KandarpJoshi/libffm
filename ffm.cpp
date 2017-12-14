@@ -722,7 +722,7 @@ ffm_model ffm_train_on_disk(string tr_path, string va_path, ffm_parameter param)
             }
         }
        // cout << total<<endl;
-        cout<<" accuracy "<< (accuracy)/competition_count<<endl;
+        cout<<" accuracy "<< (accuracy)/competition_count<<" ";
         return loss / competition_count;
     };
 
