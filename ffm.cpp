@@ -663,7 +663,7 @@ ffm_model ffm_train_on_disk(string tr_path, string va_path, ffm_parameter param)
 
                 for(ffm_int j = start ; j<end; j++){
                     ffm_float yj = prob.Y[j];
-                    ffm_float  weight  = prob.WE[j];
+                    ffm_float  weight  = 1;
 //                    if(yj<=0){
 //                        break;
 //                    }
@@ -672,7 +672,7 @@ ffm_model ffm_train_on_disk(string tr_path, string va_path, ffm_parameter param)
                         ffm_float  yk = prob.Y[k];
 
 
-                        if(yj < yk){
+                        if(yj <= yk){
                             continue;
                         }
                         ffm_node *begin = &prob.X[prob.P[j]];
@@ -722,7 +722,7 @@ ffm_model ffm_train_on_disk(string tr_path, string va_path, ffm_parameter param)
             }
         }
        // cout << total<<endl;
-        cout<<" accuracy "<< (accuracy)/competition_count<<" ";
+        cout<<" accuracy "<<setprecision(5) <<(accuracy) * 1.0/competition_count<<" ";
         return loss / competition_count;
     };
 
