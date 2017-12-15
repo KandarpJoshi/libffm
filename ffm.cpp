@@ -742,7 +742,7 @@ ffm_model ffm_train_on_disk(string tr_path, string va_path, ffm_parameter param)
                //     cout<<"index "<<index<< " value "<<exp(s[index])<<" sum "<<sum<<endl;
 //                    cout<<"devide "<<(s[index]/sum)<<endl;
                     if(yj > 0){
-                        loss -= log(exp(s[index])/sum);
+                        loss -= log((exp(s[index])/sum) + 0.0000001);
                         competition_count +=1;
                         kappa = -1 * param.sigma * (1 - exp(s[index])/sum) + param.lambda/100 * exp(s[index]);
                     }
