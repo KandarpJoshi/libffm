@@ -718,7 +718,9 @@ ffm_model ffm_train_on_disk(string tr_path, string va_path, ffm_parameter param)
 
                  */
                 vector<ffm_float> s;
+                vector<ffm_float> pb;
                 ffm_float sum = 0;
+                ffm_float maxS = 0;
                 for(ffm_int j = start ; j<end; j++){
                     //ffm_float yj = prob.Y[j];
                     ffm_float  weight  = 1;
@@ -726,10 +728,16 @@ ffm_model ffm_train_on_disk(string tr_path, string va_path, ffm_parameter param)
                     ffm_node *end = &prob.X[prob.P[j+1]];
                     ffm_float r = param.normalization? prob.R[j] : 1;
                     ffm_float  sj = wTx(begin,end,r,model);
-                    ffm_float esj = exp(param.sigma * sj);
+                 //   ffm_float esj = exp(param.sigma * sj);
                 //    cout << esj << endl;
                     s.push_back(param.sigma * sj);
-                    sum+= esj;
+                    maxS = max(param.sigma * sj , maxS);
+                }
+                for(ffm_int j = start ; j<end;j++){
+                    ffm_int index = j - start ;
+                    ffm_float exponent = exp(s[index] - maxS);
+                    pb.push_back(exponent);
+                    sum += exponent;
                 }
                // cout<<"sum " << sum <<endl;
                 for(ffm_int j = start ; j<end; j++){
@@ -739,17 +747,18 @@ ffm_model ffm_train_on_disk(string tr_path, string va_path, ffm_parameter param)
                     ffm_float r = param.normalization? prob.R[j] : 1;
                     ffm_float kappa = 0;
                     ffm_int index = j - start ;
+                    pb[index] = pb[index] / sum ;
                //     cout<<"index "<<index<< " value "<<exp(s[index])<<" sum "<<sum<<endl;
 //                    cout<<"devide "<<(s[index]/sum)<<endl;
                     if(yj > 0){
-                        loss -= log((exp(s[index])/sum) + 0.0000001);
+                        loss -= log(pb[index] + 0.0000000001);
                         competition_count +=1;
-                        kappa = -1 * param.sigma * (1 - exp(s[index])/sum) + param.lambda/100 * exp(s[index]);
+                        kappa = -1 * param.sigma * (1 - pb[index]) + param.lambda/100 * (s[index]);
                     }
                     else{
-                        loss -= log(1-(exp(s[index])/sum));
+                        loss -= log(1-(pb[index]) + 0.0000000001);
                         competition_count +=1;
-                        kappa = param.sigma * (exp(s[index]) / sum) + param.lambda/100 * exp(s[index]);
+                        kappa = param.sigma * (pb[index]) + param.lambda/100 * (s[index]);
                     }
                     if(do_update){
                         wTx(begin,end,r,model,kappa,param.eta,param.lambda,true);
