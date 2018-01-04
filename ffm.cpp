@@ -760,33 +760,27 @@ ffm_model ffm_train_on_disk(string tr_path, string va_path, ffm_parameter param)
     return model;
 }
 void ffm_save_txt(ffm_model &model , string path){
-//    printf("Hi called this function\n");
-    ofstream f_out;
-    f_out.open(path);
-//    printf("%s\n",reinterpret_cast<char*>(&model.n));
-//    cout << reinterpret_cast<char*>(&model.n) << endl;
-//    printf("%d\n",(ffm_int)(model.n));
-//    cout << (reinterpret_cast<char*>(&model.m)) << endl;
-//    printf("%d\n",(ffm_int)(model.m));
-//    printf("%d\n",(ffm_int)(model.k));
-//    printf("%d\n",(&model.k));
-//    f_out.write("start", sizeof(char)*5);
-    f_out.write(reinterpret_cast<char*>(&model.n), sizeof(ffm_int));
-    f_out.write(reinterpret_cast<char*>(&model.m), sizeof(ffm_int));
-    f_out.write(reinterpret_cast<char*>(&model.k), sizeof(ffm_int));
-    f_out.write(reinterpret_cast<char*>(&model.normalization), sizeof(bool));
+    std::ofstream f_out(path);
+    ffm_float *w = model.W;
+    ffm_int k_aligned = get_k_aligned(model.k);
 
-    ffm_long w_size = get_w_size(model);
-    // f_out.write(reinterpret_cast<char*>(model.W), sizeof(ffm_float) * w_size);
-    // Need to write chunk by chunk because some compiler use int32 and will overflow when w_size * 4 > MAX_INT
+    for(ffm_int j = 0; j < model.n; j++) {
+        for(ffm_int f = 0; f < model.m; f++) {
+            std::string out;
+            out.append(std::to_string(j));
+            out.append("^");
+            out.append(std::to_string(f));
 
-//    for(ffm_long offset = 0; offset < w_size; ) {
-//        ffm_long next_offset = min(w_size, offset + (ffm_long) sizeof(ffm_float) * kCHUNK_SIZE);
-//        ffm_long size = next_offset - offset;
-//        f_out.write(reinterpret_cast<char*>(model.W+offset), sizeof(ffm_float) * size);
-//        offset = next_offset;
-//    }
-//    f_out.write("end", sizeof(char)*3);
+            for(ffm_int d = 0; d < k_aligned;) {
+                for(ffm_int s = 0; s < kALIGN; s++, w++, d++) {
+                    out.append("^");
+                    out.append(std::to_string(w[0]));
+                }
+                w += kALIGN;
+            }
+            f_out << out << "\n";
+        }
+    }
     f_out.close();
 }
 void ffm_save_model(ffm_model &model, string path) {
