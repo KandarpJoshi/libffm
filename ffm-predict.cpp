@@ -61,10 +61,12 @@ void predict(string test_path, string model_path, string output_path) {
     for(; fgets(line, kMaxLineSize, f_in) != nullptr; i++) {
         f_out << line;
         //printf("%s\n",line);
-        char *features = strtok(line,"^");
+        char *visit_id = strtok(line,"^");
+        char *weight = strtok(nullptr,"^");
+ 
 	//printf("%s\n",features);
 	x.clear();
-        char *y_char = strtok(features, " \t");
+        char *y_char = strtok(nullptr, " \t");
         ffm_float y = (atoi(y_char)>0)? 1.0f : -1.0f;
 
         while(true) {

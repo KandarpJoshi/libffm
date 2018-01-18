@@ -770,14 +770,15 @@ void ffm_save_txt(ffm_model &model , string path){
             out.append(std::to_string(j));
             out.append("^");
             out.append(std::to_string(f));
-
+            out.append("^");
             for(ffm_int d = 0; d < k_aligned;) {
                 for(ffm_int s = 0; s < kALIGN; s++, w++, d++) {
-                    out.append("^");
                     out.append(std::to_string(w[0]));
+                    out.append(",");
                 }
                 w += kALIGN;
             }
+            out.append("0");
             f_out << out << "\n";
         }
     }
