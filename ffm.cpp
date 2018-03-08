@@ -77,8 +77,7 @@ inline ffm_float wTx(
     ffm_node *end,
     ffm_float r,
     ffm_model &model,
-    ffm_int kwdRelatedFeatures,
-    ffm_float kappa=0, 
+    ffm_float kappa=0,
     ffm_float eta=0, 
     ffm_float lambda=0,
     bool do_update=false) {
@@ -93,7 +92,7 @@ inline ffm_float wTx(
 
     __m128 XMMt = _mm_setzero_ps();
 
-    for(ffm_node *N1 = begin; N1 != end && index < kwdRelatedFeatures; N1++ , index++)
+    for(ffm_node *N1 = begin; N1 != end ; N1++ , index++)
     {
         ffm_int j1 = N1->j;
         ffm_int f1 = N1->f;
@@ -186,7 +185,6 @@ inline ffm_float wTx(
     ffm_node *end,
     ffm_float r,
     ffm_model &model,
-    ffm_int kwdRelatedFeatures,
     ffm_float kappa=0, 
     ffm_float eta=0, 
     ffm_float lambda=0,
@@ -197,7 +195,7 @@ inline ffm_float wTx(
 
     ffm_float t = 0;
     ffm_int index =0;
-    for(ffm_node *N1 = begin; N1 != end && index < kwdRelatedFeatures; N1++ , index++) {
+    for(ffm_node *N1 = begin; N1 != end ; N1++ , index++) {
         ffm_int j1 = N1->j;
         ffm_int f1 = N1->f;
         ffm_float v1 = N1->v;
@@ -319,8 +317,8 @@ struct problem_on_disk {
     vector<ffm_node> X;
     vector<ffm_long> B;
     vector<ffm_int> VP;
-    vector<ffm_float> WE;
-    vector<ffm_float> IMP;
+    vector<ffm_double> WE;
+    vector<ffm_double> IMP;
 
     problem_on_disk(string path) {
         f.open(path, ios::in | ios::binary);
@@ -359,10 +357,10 @@ struct problem_on_disk {
         f.read(reinterpret_cast<char *>(VP.data()), sizeof(ffm_int) * (np+1));
 
         WE.resize(l);
-        f.read(reinterpret_cast<char*>(WE.data()), sizeof(ffm_float) * l);
+        f.read(reinterpret_cast<char*>(WE.data()), sizeof(ffm_double) * l);
 
         IMP.resize(l);
-        f.read(reinterpret_cast<char*>(IMP.data()), sizeof(ffm_float) * l);
+        f.read(reinterpret_cast<char*>(IMP.data()), sizeof(ffm_double) * l);
 
 
         //cout << "loading completed" << endl;
@@ -429,13 +427,13 @@ void txt2bin(string txt_path, string bin_path) {
     disk_problem_meta meta;
 
     vector<ffm_float> Y;
-    vector<ffm_float> WE;
+    vector<ffm_double> WE;
     vector<ffm_float> R;
     vector<ffm_long> P(1, 0);
     vector<ffm_node> X;
     vector<ffm_long> B;
     vector<ffm_int> VP;
-    vector<ffm_float> IMP;
+    vector<ffm_double> IMP;
 
     auto write_chunk = [&] () {
         B.push_back(f_bin.tellp());
@@ -450,8 +448,8 @@ void txt2bin(string txt_path, string bin_path) {
         f_bin.write(reinterpret_cast<char*>(X.data()), sizeof(ffm_node) * nnz);
         f_bin.write(reinterpret_cast<char*>(&np), sizeof(ffm_int));
         f_bin.write(reinterpret_cast<char*>(VP.data()), sizeof(ffm_int) * (np + 1));
-        f_bin.write(reinterpret_cast<char*>(WE.data()), sizeof(ffm_float) * (l));
-        f_bin.write(reinterpret_cast<char*>(IMP.data()), sizeof(ffm_float) * (l));
+        f_bin.write(reinterpret_cast<char*>(WE.data()), sizeof(ffm_double) * (l));
+        f_bin.write(reinterpret_cast<char*>(IMP.data()), sizeof(ffm_double) * (l));
 
         Y.clear();
         R.clear();
@@ -487,7 +485,8 @@ void txt2bin(string txt_path, string bin_path) {
         char *weight = strtok(nullptr,"^");
         char *impression = strtok(nullptr,"^");
         char *y_char = strtok(nullptr, " \t");
-       // cout << y_char << endl;
+
+        cout <<weight<<" " << impression <<" "<< y_char << endl;
         ffm_float y = atoi(y_char);
 
         ffm_float scale = 0;
@@ -511,7 +510,9 @@ void txt2bin(string txt_path, string bin_path) {
             scale += N.v*N.v;
         }
         scale = 1.0 / scale;
-        WE.push_back(atof(weight));
+       // setprecision(500);
+      //  cout <<"weight line "<<weight <<setprecision()<< " "<< ((double)1.00)/50.00<<" "<<stold(weight) <<" "<< atof(weight)<<endl;
+        WE.push_back(stold(weight));
         IMP.push_back(atof(impression));
         Y.push_back(y);
         R.push_back(scale);
@@ -676,21 +677,22 @@ ffm_model ffm_train_on_disk(string tr_path, string va_path, ffm_parameter param)
 
                 for(ffm_int j = start ; j<end; j++){
                     ffm_float yj = prob.Y[j];
-                    ffm_float weight  = prob.WE[j];
-                    ffm_float impJ = prob.IMP[j];
+                    ffm_double weight  = prob.WE[j];
+                    ffm_double impJ = prob.IMP[j];
+
 //                    if(yj<=0){
 //                        break;
 //                    }
                     for(ffm_int k = j+1 ;k < end ;k++){
 
                         ffm_float  yk = prob.Y[k];
-                        ffm_float  impK = prob.IMP[k];
-
+                        ffm_double  impK = prob.IMP[k];
+                       // cout<<start<<" " <<end <<" "<< j<<" "<<k<<" "<<weight <<" "<<impJ<< " "<<impK<< yj <<" " << yk << " "<<endl;
 
                         if(yj <= yk){
                             continue;
                         }
-                        ffm_float ratio = 1.0;
+                        ffm_double ratio = 1.0;
                         if(impJ > 0 ){
                             ratio = impK / impJ ;
                         }
@@ -718,15 +720,14 @@ ffm_model ffm_train_on_disk(string tr_path, string va_path, ffm_parameter param)
                         }
                         if(yj > yk){
 
-                            ffm_float lambdajk = - param.sigma /(1 + exp(param.sigma * (sj-sk)));
-
+                            ffm_double lambdajk = - param.sigma /(1 + exp(param.sigma * (sj-sk)));
                             if(sj > sk){
                                 accuracy+= ratio * weight;
                             }
 
                             if(do_update){
 
-                                ffm_float kappa = ratio * weight * lambdajk;
+                                ffm_float kappa = (ratio * weight) *100 * lambdajk;
                                 wTx(begin,end,r,model,kappa,param.eta,param.lambda,true);
 
                                 wTx(begin2,end2,r2,model,-1*kappa,param.eta,param.lambda,true);
