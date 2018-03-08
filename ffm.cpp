@@ -76,14 +76,16 @@ inline ffm_float wTx(
     ffm_node *begin,
     ffm_node *end,
     ffm_float r,
-    ffm_model &model, 
+    ffm_model &model,
+    ffm_int kwdRelatedFeatures,
     ffm_float kappa=0, 
     ffm_float eta=0, 
-    ffm_float lambda=0, 
+    ffm_float lambda=0,
     bool do_update=false) {
 
     ffm_int align0 = 2 * get_k_aligned(model.k);
     ffm_int align1 = model.m * align0;
+    ffm_int index = 0 ;
 
     __m128 XMMkappa = _mm_set1_ps(kappa);
     __m128 XMMeta = _mm_set1_ps(eta);
@@ -91,7 +93,7 @@ inline ffm_float wTx(
 
     __m128 XMMt = _mm_setzero_ps();
 
-    for(ffm_node *N1 = begin; N1 != end; N1++)
+    for(ffm_node *N1 = begin; N1 != end && index < kwdRelatedFeatures; N1++ , index++)
     {
         ffm_int j1 = N1->j;
         ffm_int f1 = N1->f;
@@ -183,7 +185,8 @@ inline ffm_float wTx(
     ffm_node *begin,
     ffm_node *end,
     ffm_float r,
-    ffm_model &model, 
+    ffm_model &model,
+    ffm_int kwdRelatedFeatures,
     ffm_float kappa=0, 
     ffm_float eta=0, 
     ffm_float lambda=0,
@@ -193,7 +196,8 @@ inline ffm_float wTx(
     ffm_int align1 = model.m * align0;
 
     ffm_float t = 0;
-    for(ffm_node *N1 = begin; N1 != end; N1++) {
+    ffm_int index =0;
+    for(ffm_node *N1 = begin; N1 != end && index < kwdRelatedFeatures; N1++ , index++) {
         ffm_int j1 = N1->j;
         ffm_int f1 = N1->f;
         ffm_float v1 = N1->v;
@@ -316,6 +320,7 @@ struct problem_on_disk {
     vector<ffm_long> B;
     vector<ffm_int> VP;
     vector<ffm_float> WE;
+    vector<ffm_float> IMP;
 
     problem_on_disk(string path) {
         f.open(path, ios::in | ios::binary);
@@ -356,7 +361,11 @@ struct problem_on_disk {
         WE.resize(l);
         f.read(reinterpret_cast<char*>(WE.data()), sizeof(ffm_float) * l);
 
-       //cout << "loading completed" << endl;
+        IMP.resize(l);
+        f.read(reinterpret_cast<char*>(IMP.data()), sizeof(ffm_float) * l);
+
+
+        //cout << "loading completed" << endl;
         return l;
     }
 
@@ -426,6 +435,7 @@ void txt2bin(string txt_path, string bin_path) {
     vector<ffm_node> X;
     vector<ffm_long> B;
     vector<ffm_int> VP;
+    vector<ffm_float> IMP;
 
     auto write_chunk = [&] () {
         B.push_back(f_bin.tellp());
@@ -441,6 +451,7 @@ void txt2bin(string txt_path, string bin_path) {
         f_bin.write(reinterpret_cast<char*>(&np), sizeof(ffm_int));
         f_bin.write(reinterpret_cast<char*>(VP.data()), sizeof(ffm_int) * (np + 1));
         f_bin.write(reinterpret_cast<char*>(WE.data()), sizeof(ffm_float) * (l));
+        f_bin.write(reinterpret_cast<char*>(IMP.data()), sizeof(ffm_float) * (l));
 
         Y.clear();
         R.clear();
@@ -448,6 +459,7 @@ void txt2bin(string txt_path, string bin_path) {
         VP.clear();
         X.clear();
         WE.clear();
+        IMP.clear();
 
         p = 0;
         np = 0;
@@ -473,7 +485,7 @@ void txt2bin(string txt_path, string bin_path) {
         }
         previous_visit = current_visit;
         char *weight = strtok(nullptr,"^");
-
+        char *impression = strtok(nullptr,"^");
         char *y_char = strtok(nullptr, " \t");
        // cout << y_char << endl;
         ffm_float y = atoi(y_char);
@@ -500,6 +512,7 @@ void txt2bin(string txt_path, string bin_path) {
         }
         scale = 1.0 / scale;
         WE.push_back(atof(weight));
+        IMP.push_back(atof(impression));
         Y.push_back(y);
         R.push_back(scale);
         P.push_back(p);
@@ -663,17 +676,23 @@ ffm_model ffm_train_on_disk(string tr_path, string va_path, ffm_parameter param)
 
                 for(ffm_int j = start ; j<end; j++){
                     ffm_float yj = prob.Y[j];
-                    ffm_float  weight  = 1;
+                    ffm_float weight  = prob.WE[j];
+                    ffm_float impJ = prob.IMP[j];
 //                    if(yj<=0){
 //                        break;
 //                    }
                     for(ffm_int k = j+1 ;k < end ;k++){
 
                         ffm_float  yk = prob.Y[k];
+                        ffm_float  impK = prob.IMP[k];
 
 
                         if(yj <= yk){
                             continue;
+                        }
+                        ffm_float ratio = 1.0;
+                        if(impJ > 0 ){
+                            ratio = impK / impJ ;
                         }
                         ffm_node *begin = &prob.X[prob.P[j]];
                         ffm_node *end = &prob.X[prob.P[j+1]];
@@ -690,7 +709,7 @@ ffm_model ffm_train_on_disk(string tr_path, string va_path, ffm_parameter param)
                             ffm_float lambdajk = param.sigma * ((1.0/2) - (1.0 / (1 + exp(param.sigma * (sj-sk)))));
                             if(do_update){
 
-                                ffm_float kappa = weight * lambdajk;
+                                ffm_float kappa = ratio * weight * lambdajk;
                                 wTx(begin,end,r,model,kappa,param.eta,param.lambda,true);
 
                                 wTx(begin2,end2,r2,model,-1*kappa,param.eta,param.lambda,true);
@@ -702,19 +721,19 @@ ffm_model ffm_train_on_disk(string tr_path, string va_path, ffm_parameter param)
                             ffm_float lambdajk = - param.sigma /(1 + exp(param.sigma * (sj-sk)));
 
                             if(sj > sk){
-                                accuracy+=weight;
+                                accuracy+= ratio * weight;
                             }
 
                             if(do_update){
 
-                                ffm_float kappa = weight * lambdajk;
+                                ffm_float kappa = ratio * weight * lambdajk;
                                 wTx(begin,end,r,model,kappa,param.eta,param.lambda,true);
 
                                 wTx(begin2,end2,r2,model,-1*kappa,param.eta,param.lambda,true);
 
                             }
-                            loss += weight * log1p(exp(-1 * param.sigma * (sj - sk)));
-                            competition_count += weight;
+                            loss += ratio * weight * log1p(exp(-1 * param.sigma * (sj - sk)));
+                            competition_count += ratio * weight;
                         }
 
                     }
@@ -765,12 +784,16 @@ void ffm_save_txt(ffm_model &model , string path){
     ffm_int k_aligned = get_k_aligned(model.k);
 
     for(ffm_int j = 0; j < model.n; j++) {
+        std::string out;
+        out.append(std::to_string(j));
+        out.append("^");
+        out.append("{");
         for(ffm_int f = 0; f < model.m; f++) {
-            std::string out;
-            out.append(std::to_string(j));
-            out.append("^");
+            out.append("\"");
             out.append(std::to_string(f));
-            out.append("^");
+            out.append("\"");
+            out.append(":");
+            out.append("\"");
             for(ffm_int d = 0; d < k_aligned;) {
                 for(ffm_int s = 0; s < kALIGN; s++, w++, d++) {
                     out.append(std::to_string(w[0]));
@@ -779,8 +802,12 @@ void ffm_save_txt(ffm_model &model , string path){
                 w += kALIGN;
             }
             out.append("0");
-            f_out << out << "\n";
+            out.append("\"");
+            if(f + 1 < model.m)
+                out.append(",");
         }
+        out.append("}");
+        f_out << out << "\n";
     }
     f_out.close();
 }
