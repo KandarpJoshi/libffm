@@ -486,7 +486,7 @@ void txt2bin(string txt_path, string bin_path) {
         char *impression = strtok(nullptr,"^");
         char *y_char = strtok(nullptr, " \t");
 
-        cout <<weight<<" " << impression <<" "<< y_char << endl;
+       // cout <<weight<<" " << impression <<" "<< y_char << endl;
         ffm_float y = atoi(y_char);
 
         ffm_float scale = 0;
@@ -677,7 +677,7 @@ ffm_model ffm_train_on_disk(string tr_path, string va_path, ffm_parameter param)
 
                 for(ffm_int j = start ; j<end; j++){
                     ffm_float yj = prob.Y[j];
-                    ffm_double weight  = prob.WE[j];
+                    ffm_double weight  = min(1.0,20*prob.WE[j]);
                     ffm_double impJ = prob.IMP[j];
 
 //                    if(yj<=0){
@@ -693,9 +693,13 @@ ffm_model ffm_train_on_disk(string tr_path, string va_path, ffm_parameter param)
                             continue;
                         }
                         ffm_double ratio = 1.0;
+                        ffm_double impWeightJ = 1.0;
+                        ffm_double impWeightK = 1.0;
                         if(impJ > 0 ){
-                            ratio = impK / impJ ;
+                            ratio = pow(impK/impJ , 0.2);
+                            if(ratio == 0) ratio = 1.0;
                         }
+                       
                         ffm_node *begin = &prob.X[prob.P[j]];
                         ffm_node *end = &prob.X[prob.P[j+1]];
                         ffm_float r = param.normalization? prob.R[j] : 1;
@@ -727,7 +731,8 @@ ffm_model ffm_train_on_disk(string tr_path, string va_path, ffm_parameter param)
 
                             if(do_update){
 
-                                ffm_float kappa = (ratio * weight) *100 * lambdajk;
+                                ffm_float kappa = (ratio * weight) *10 * lambdajk;
+                               
                                 wTx(begin,end,r,model,kappa,param.eta,param.lambda,true);
 
                                 wTx(begin2,end2,r2,model,-1*kappa,param.eta,param.lambda,true);
@@ -857,11 +862,13 @@ ffm_model ffm_load_model(string path) {
 
 ffm_float ffm_predict(ffm_node *begin, ffm_node *end, ffm_model &model) {
     ffm_float r = 1;
+    printf("hi\n");
     if(model.normalization) {
         r = 0;
         for(ffm_node *N = begin; N != end; N++)
             r += N->v*N->v; 
         r = 1/r;
+       printf("inside\n");
     }
 
     ffm_float t = wTx(begin, end, r, model);
