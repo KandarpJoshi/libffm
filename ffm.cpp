@@ -487,7 +487,7 @@ void txt2bin(string txt_path, string bin_path) {
         char *y_char = strtok(nullptr, " \t");
 
        // cout <<weight<<" " << impression <<" "<< y_char << endl;
-        ffm_float y = atoi(y_char);
+        ffm_float y = atof(y_char);
 
         ffm_float scale = 0;
         for(; ; p++) {
@@ -677,15 +677,19 @@ ffm_model ffm_train_on_disk(string tr_path, string va_path, ffm_parameter param)
 
                 for(ffm_int j = start ; j<end; j++){
                     ffm_float yj = prob.Y[j];
-                    ffm_double weight  = min(1.0,20*prob.WE[j]);
+                    ffm_double weight  = min(1.0,prob.WE[j]);
+              
                     ffm_double impJ = prob.IMP[j];
 
 //                    if(yj<=0){
 //                        break;
 //                    }
                     for(ffm_int k = j+1 ;k < end ;k++){
-
-                        ffm_float  yk = prob.Y[k];
+                        weight = weight * min(1.0,prob.WE[k]);
+//                       if(weight < 1 ){
+//		       	weight = 0.0;
+//			}
+		        ffm_float  yk = prob.Y[k];
                         ffm_double  impK = prob.IMP[k];
                        // cout<<start<<" " <<end <<" "<< j<<" "<<k<<" "<<weight <<" "<<impJ<< " "<<impK<< yj <<" " << yk << " "<<endl;
 
@@ -723,23 +727,23 @@ ffm_model ffm_train_on_disk(string tr_path, string va_path, ffm_parameter param)
                             }
                         }
                         if(yj > yk){
-
+                            ffm_double quantm = (yj - yk);
                             ffm_double lambdajk = - param.sigma /(1 + exp(param.sigma * (sj-sk)));
                             if(sj > sk){
-                                accuracy+= ratio * weight;
+                                accuracy+= quantm * ratio * weight;
                             }
 
                             if(do_update){
 
-                                ffm_float kappa = (ratio * weight) *10 * lambdajk;
+                                ffm_float kappa = (ratio * weight * quantm ) *10 * lambdajk;
                                
                                 wTx(begin,end,r,model,kappa,param.eta,param.lambda,true);
 
                                 wTx(begin2,end2,r2,model,-1*kappa,param.eta,param.lambda,true);
 
                             }
-                            loss += ratio * weight * log1p(exp(-1 * param.sigma * (sj - sk)));
-                            competition_count += ratio * weight;
+                            loss += ratio * weight * quantm * log1p(exp(-1 * param.sigma * (sj - sk)));
+                            competition_count += ratio * weight * quantm;
                         }
 
                     }
