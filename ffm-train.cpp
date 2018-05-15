@@ -109,7 +109,26 @@ Option parse_option(int argc, char **argv) {
             opt.quiet = true;
         } else if(args[i].compare("--auto-stop") == 0) {
             opt.param.auto_stop = true;
-        } else {
+        } else if(args[i].compare("-m") == 0){
+            if(i == argc-1)
+                throw invalid_argument("need to specify multiplier for different field comma separated after -m");
+            i++;
+            int len = args[i].length();
+            char value[len+1];
+            strcpy(value, args[i].c_str());
+            char* field0 = strtok(value,":");
+            char* multiplier0 = strtok(nullptr,",");
+            opt.param.multiplier[atoi(field0)] = atof(multiplier0);
+            while (true) {
+                char* field = strtok(nullptr,":");
+                char* multiplier = strtok(nullptr,",");
+                if(field == nullptr){
+                    break;
+                }
+                opt.param.multiplier[atoi(field)] = atof(multiplier);
+            }
+
+        } else{
             break;
         }
     }
@@ -172,3 +191,5 @@ int main(int argc, char **argv) {
 
     return 0;
 }
+
+
