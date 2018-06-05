@@ -732,22 +732,26 @@ ffm_model ffm_train_on_disk(string tr_path, string va_path, ffm_parameter param)
                         }
                         if(yj > yk){
                             ffm_double quantm = (yj - yk);
-                            ffm_double lambdajk = - param.sigma /(1 + exp(param.sigma * (sj-sk)));
+                            ffm_double lambdajk = (sj-sk) > 50 ? 0.0 :  - param.sigma /(1 + exp(param.sigma * (sj-sk)));
                             if(sj > sk){
                                 accuracy+= quantm * ratio * weight;
                             }
 
                             if(do_update){
 
-                                ffm_float kappa = (ratio * weight * quantm ) *10 * lambdajk;
+                                ffm_float kappa = (ratio * weight * quantm ) * lambdajk;
 
                                 wTx(begin,end,r,model,kappa,param.eta,param.lambda,param.multiplier,true);
 
                                 wTx(begin2,end2,r2,model,-1*kappa,param.eta,param.lambda,param.multiplier,true);
 
                             }
-                            loss += ratio * weight * quantm * log1p(exp(-1 * param.sigma * (sj - sk)));
-                            competition_count += ratio * weight * quantm;
+			    if(sk-sj < 50)
+                            	loss += ratio * weight * quantm * log1p(exp(-1 * param.sigma * (sj - sk)));
+                            else
+				loss += ratio * weight * quantm * param.sigma * (sk - sj);
+    
+			competition_count += ratio * weight * quantm;
                         }
 
                     }
