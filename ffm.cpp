@@ -80,6 +80,7 @@ inline ffm_float wTx(
     ffm_float kappa=0,
     ffm_float eta=0, 
     ffm_float lambda=0,
+    ffm_float multiplier[] = nullptr,
     bool do_update=false) {
 
     ffm_int align0 = 2 * get_k_aligned(model.k);
@@ -88,7 +89,6 @@ inline ffm_float wTx(
 
     __m128 XMMkappa = _mm_set1_ps(kappa);
     __m128 XMMeta = _mm_set1_ps(eta);
-    __m128 XMMlambda = _mm_set1_ps(lambda);
 
     __m128 XMMt = _mm_setzero_ps();
 
@@ -105,6 +105,9 @@ inline ffm_float wTx(
             ffm_int j2 = N2->j;
             ffm_int f2 = N2->f;
             ffm_float v2 = N2->v;
+            __m128 XMMlambda1 = _mm_set1_ps(lambda * multiplier[f1]);
+            __m128 XMMlambda2 = _mm_set1_ps(lambda * multiplier[f2]);
+
             if(j2 >= model.n || f2 >= model.m)
                 continue;
 
@@ -132,10 +135,10 @@ inline ffm_float wTx(
                     __m128 XMMwg2 = _mm_load_ps(wg2);
 
                     __m128 XMMg1 = _mm_add_ps(
-                                   _mm_mul_ps(XMMlambda, XMMw1),
+                                   _mm_mul_ps(XMMlambda2, XMMw1),
                                    _mm_mul_ps(XMMkappav, XMMw2));
                     __m128 XMMg2 = _mm_add_ps(
-                                   _mm_mul_ps(XMMlambda, XMMw2),
+                                   _mm_mul_ps(XMMlambda1, XMMw2),
                                    _mm_mul_ps(XMMkappav, XMMw1));
 
                     XMMwg1 = _mm_add_ps(XMMwg1, _mm_mul_ps(XMMg1, XMMg1));
@@ -188,6 +191,7 @@ inline ffm_float wTx(
     ffm_float kappa=0, 
     ffm_float eta=0, 
     ffm_float lambda=0,
+    ffm_float multiplier[] = nullptr,
     bool do_update=false) {
 
     ffm_int align0 = 2 * get_k_aligned(model.k);
@@ -219,8 +223,8 @@ inline ffm_float wTx(
                 ffm_float *wg2 = w2 + kALIGN;
                 for(ffm_int d = 0; d < align0; d += kALIGN * 2)
                 {
-                    ffm_float g1 = lambda * w1[d] + kappa * w2[d] * v;
-                    ffm_float g2 = lambda * w2[d] + kappa * w1[d] * v;
+                    ffm_float g1 = lambda * multiplier[f2] * w1[d] + kappa * w2[d] * v;
+                    ffm_float g2 = lambda * multiplier[f1] * w2[d] + kappa * w1[d] * v;
 
                     wg1[d] += g1 * g1;
                     wg2[d] += g2 * g2;
@@ -678,7 +682,7 @@ ffm_model ffm_train_on_disk(string tr_path, string va_path, ffm_parameter param)
                 for(ffm_int j = start ; j<end; j++){
                     ffm_float yj = prob.Y[j];
                     ffm_double weight  = min(1.0,prob.WE[j]);
-              
+
                     ffm_double impJ = prob.IMP[j];
 
 //                    if(yj<=0){
@@ -703,7 +707,7 @@ ffm_model ffm_train_on_disk(string tr_path, string va_path, ffm_parameter param)
                             ratio = pow(impK/impJ , 0.2);
                             if(ratio == 0) ratio = 1.0;
                         }
-                       
+
                         ffm_node *begin = &prob.X[prob.P[j]];
                         ffm_node *end = &prob.X[prob.P[j+1]];
                         ffm_float r = param.normalization? prob.R[j] : 1;
@@ -720,9 +724,9 @@ ffm_model ffm_train_on_disk(string tr_path, string va_path, ffm_parameter param)
                             if(do_update){
 
                                 ffm_float kappa = ratio * weight * lambdajk;
-                                wTx(begin,end,r,model,kappa,param.eta,param.lambda,true);
+                                wTx(begin,end,r,model,kappa,param.eta,param.lambda,param.multiplier,true);
 
-                                wTx(begin2,end2,r2,model,-1*kappa,param.eta,param.lambda,true);
+                                wTx(begin2,end2,r2,model,-1*kappa,param.eta,param.lambda,param.multiplier,true);
 
                             }
                         }
@@ -736,10 +740,10 @@ ffm_model ffm_train_on_disk(string tr_path, string va_path, ffm_parameter param)
                             if(do_update){
 
                                 ffm_float kappa = (ratio * weight * quantm ) *10 * lambdajk;
-                               
-                                wTx(begin,end,r,model,kappa,param.eta,param.lambda,true);
 
-                                wTx(begin2,end2,r2,model,-1*kappa,param.eta,param.lambda,true);
+                                wTx(begin,end,r,model,kappa,param.eta,param.lambda,param.multiplier,true);
+
+                                wTx(begin2,end2,r2,model,-1*kappa,param.eta,param.lambda,param.multiplier,true);
 
                             }
                             loss += ratio * weight * quantm * log1p(exp(-1 * param.sigma * (sj - sk)));
@@ -881,4 +885,6 @@ ffm_float ffm_predict(ffm_node *begin, ffm_node *end, ffm_model &model) {
 }
 
 } // namespace ffm
+
+
 

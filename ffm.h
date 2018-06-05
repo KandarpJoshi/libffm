@@ -53,3 +53,4 @@ ffm_float ffm_predict(ffm_node *begin, ffm_node *end, ffm_model &model);
 } // namespace ffm
 
 #endif // _LIBFFM_H
+
