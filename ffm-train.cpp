@@ -109,13 +109,6 @@ Option parse_option(int argc, char **argv) {
             opt.quiet = true;
         } else if(args[i].compare("--auto-stop") == 0) {
             opt.param.auto_stop = true;
-        } else if(args[i].compare("-b") == 0) {
-            if(i == argc-1)
-                throw invalid_argument("need to specify beta after -b");
-            i++;
-            opt.param.beta = atof(args[i].c_str());
-            if(opt.param.beta < 0)
-                throw invalid_argument("beta should not be smaller than zero");
         } else if(args[i].compare("-m") == 0){
             if(i == argc-1)
                 throw invalid_argument("need to specify multiplier for different field comma separated after -m");
