@@ -31,7 +31,6 @@ struct ffm_parameter {
     ffm_float eta = 0.02; // learning rate
     ffm_float lambda = 0.002; // regularization parameter
     ffm_float multiplier[128] = {0}; // multiplier for different field.
-    ffm_float beta = 0.9;
     ffm_int nr_iters = 15;
     ffm_float sigma = 0.5;
     ffm_int k = 4; // number of latent factors
