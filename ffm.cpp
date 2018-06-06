@@ -93,6 +93,7 @@ inline ffm_float wTx(
 
     __m128 XMMt = _mm_setzero_ps();
     __m128 XMMbeta = _mm_set1_ps(beta);
+    __m128 XMMconst = _mm_set1_ps(1.0);
 
     for(ffm_node *N1 = begin; N1 != end ; N1++ , index++)
     {
@@ -147,9 +148,9 @@ inline ffm_float wTx(
                     XMMwg2 = _mm_add_ps(_mm_mul_ps(XMMbeta,XMMwg2), _mm_mul_ps(XMMg2, XMMg2));
 
                     XMMw1 = _mm_sub_ps(XMMw1, _mm_mul_ps(XMMeta, 
-                            _mm_mul_ps(_mm_rsqrt_ps(XMMwg1), XMMg1)));
+                            _mm_mul_ps(_mm_rsqrt_ps(_mm_add_ps(XMMwg1,XMMconst)), XMMg1)));
                     XMMw2 = _mm_sub_ps(XMMw2, _mm_mul_ps(XMMeta, 
-                            _mm_mul_ps(_mm_rsqrt_ps(XMMwg2), XMMg2)));
+                            _mm_mul_ps(_mm_rsqrt_ps(_mm_add_ps(XMMwg2,XMMconst)), XMMg2)));
 
                     _mm_store_ps(w1, XMMw1);
                     _mm_store_ps(w2, XMMw2);
@@ -232,8 +233,8 @@ inline ffm_float wTx(
                     wg1[d] = beta * wg1[d] + g1 * g1;
                     wg2[d] = beta * wg2[d] + g2 * g2;
 
-                    w1[d] -= eta / sqrt(wg1[d]) * g1;
-                    w2[d] -= eta / sqrt(wg2[d]) * g2;
+                    w1[d] -= eta / sqrt(wg1[d] + 1) * g1;
+                    w2[d] -= eta / sqrt(wg2[d] + 1) * g2;
                 }
             } else {
                 for(ffm_int d = 0; d < align0; d += kALIGN * 2)
@@ -295,7 +296,7 @@ ffm_model init_model(ffm_int n, ffm_int m, ffm_parameter param)
             for(ffm_int d = 0; d < k_aligned;) {
                 for(ffm_int s = 0; s < kALIGN; s++, w++, d++) {
                     w[0] = (d < model.k)? coef * distribution(generator) : 0.0;
-                    w[kALIGN] = 1;
+                    w[kALIGN] = 0.0;
                 }
                 w += kALIGN;
             }
