@@ -708,7 +708,8 @@ ffm_model ffm_train_on_disk(string tr_path, string va_path, ffm_parameter param)
                         ffm_double impWeightJ = 1.0;
                         ffm_double impWeightK = 1.0;
                         if(impJ > 0 ){
-                            ratio = pow(impK/impJ , 0.2);
+                           // ratio = pow(impK/impJ , 0.2);
+                            ratio = 1;
                             if(ratio == 0) ratio = 1.0;
                         }
 
@@ -736,26 +737,35 @@ ffm_model ffm_train_on_disk(string tr_path, string va_path, ffm_parameter param)
                         }
                         if(yj > yk){
                             ffm_double quantm = (yj - yk);
-                            ffm_double lambdajk = (sj-sk) > 50 ? 0.0 :  - param.sigma /(1 + exp(param.sigma * (sj-sk)));
+                            ffm_double lambdajk = (sj-sk) > 50 ? 0.0 :  -  param.sigma /(1 + exp(param.sigma * (sj-sk)));
+                            ffm_double lambdakj = (sk-sj) > 50 ? 0.0 :  -  param.sigma /(1 + exp(param.sigma * (sk-sj)));
+
                             if(sj > sk){
                                 accuracy+= quantm * ratio * weight;
+                            }
+                            else{
+                                accuracy+= (1 - quantm) * ratio * weight;
                             }
 
                             if(do_update){
 
-                                ffm_float kappa = (ratio * weight * quantm ) * lambdajk;
+                                ffm_float kappa = (ratio * weight * yj ) * lambdajk - (ratio * weight * (1 - yj)) * lambdakj;
 
                                 wTx(begin,end,r,model,kappa,param.eta,param.lambda,param.multiplier,param.beta,true);
 
                                 wTx(begin2,end2,r2,model,-1*kappa,param.eta,param.lambda,param.multiplier,param.beta,true);
 
                             }
-			            if(sk-sj < 50)
-                            loss += ratio * weight * quantm * log1p(exp(-1 * param.sigma * (sj - sk)));
-                        else
-				            loss += ratio * weight * quantm * param.sigma * (sk - sj);
-    
-	    		        competition_count += ratio * weight * quantm;
+			                if(sk-sj < 50)
+                                loss += ratio * weight * quantm * log1p(exp(-1 * param.sigma * (sj - sk)));
+                            else
+				                loss += ratio * weight * quantm * param.sigma * (sk - sj);
+                            if(sj-sk < 50)
+                                loss += ratio * weight * (1 - quantm) * log1p(exp(-1 * param.sigma * (sk - sj)));
+                            else
+                                loss += ratio * weight * (1 - quantm) * param.sigma * (sj - sk);
+
+                            competition_count += ratio * weight;
                         }
 
                     }
