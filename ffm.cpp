@@ -295,8 +295,9 @@ ffm_model init_model(ffm_int n, ffm_int m, ffm_parameter param)
         for(ffm_int f = 0; f < model.m; f++) {
             for(ffm_int d = 0; d < k_aligned;) {
                 for(ffm_int s = 0; s < kALIGN; s++, w++, d++) {
-                    w[0] = (d < model.k)? coef * distribution(generator) : 0.0;
-                    w[kALIGN] = 0.0;
+              //      w[0] = (d < model.k)? coef * distribution(generator) : 0.0;
+                	w[0] = 0.1; 
+		   w[kALIGN] = 0.0;
                 }
                 w += kALIGN;
             }
@@ -685,7 +686,7 @@ ffm_model ffm_train_on_disk(string tr_path, string va_path, ffm_parameter param)
 
                 for(ffm_int j = start ; j<end; j++){
                     ffm_float yj = prob.Y[j];
-                    ffm_double weight  = min(1.0,prob.WE[j]);
+                    ffm_double weight  = prob.WE[j];
 
                     ffm_double impJ = prob.IMP[j];
 
@@ -693,7 +694,7 @@ ffm_model ffm_train_on_disk(string tr_path, string va_path, ffm_parameter param)
 //                        break;
 //                    }
                     for(ffm_int k = j+1 ;k < end ;k++){
-                        weight = weight * min(1.0,prob.WE[k]);
+                        weight = weight * prob.WE[k];
 //                       if(weight < 1 ){
 //		       	weight = 0.0;
 //			}
