@@ -81,6 +81,7 @@ inline ffm_float wTx(
     ffm_float eta=0, 
     ffm_float lambda=0,
     ffm_float multiplier[] = nullptr,
+    ffm_float multiplier2[] = nullptr,
     ffm_float beta = 0.9,
     bool do_update=false) {
 
@@ -108,8 +109,8 @@ inline ffm_float wTx(
             ffm_int j2 = N2->j;
             ffm_int f2 = N2->f;
             ffm_float v2 = N2->v;
-            __m128 XMMlambda1 = _mm_set1_ps(lambda * multiplier[f1]);
-            __m128 XMMlambda2 = _mm_set1_ps(lambda * multiplier[f2]);
+            __m128 XMMlambda1 = _mm_set1_ps(lambda * multiplier[f1] * multiplier2[f2]);
+            __m128 XMMlambda2 = _mm_set1_ps(lambda * multiplier[f2] * multiplier2[f1]);
 
             if(j2 >= model.n || f2 >= model.m)
                 continue;
@@ -195,6 +196,7 @@ inline ffm_float wTx(
     ffm_float eta=0, 
     ffm_float lambda=0,
     ffm_float multiplier[] = nullptr,
+    ffm_float multiplier2[] = nullptr,
     ffm_float beta = 0.9,
     bool do_update=false) {
 
@@ -227,8 +229,8 @@ inline ffm_float wTx(
                 ffm_float *wg2 = w2 + kALIGN;
                 for(ffm_int d = 0; d < align0; d += kALIGN * 2)
                 {
-                    ffm_float g1 = lambda * multiplier[f2] * w1[d] + kappa * w2[d] * v;
-                    ffm_float g2 = lambda * multiplier[f1] * w2[d] + kappa * w1[d] * v;
+                    ffm_float g1 = lambda * multiplier[f2] * multiplier2[f1] * w1[d] + kappa * w2[d] * v;
+                    ffm_float g2 = lambda * multiplier[f1] * multiplier2[f2] * w2[d] + kappa * w1[d] * v;
 
                     wg1[d] = beta * wg1[d] + g1 * g1;
                     wg2[d] = beta * wg2[d] + g2 * g2;
@@ -730,9 +732,9 @@ ffm_model ffm_train_on_disk(string tr_path, string va_path, ffm_parameter param)
                             if(do_update){
 
                                 ffm_float kappa = ratio * weight * lambdajk;
-                                wTx(begin,end,r,model,kappa,param.eta,param.lambda,param.multiplier,param.beta,true);
+                                wTx(begin,end,r,model,kappa,param.eta,param.lambda,param.multiplier,param.multiplier2,param.beta,true);
 
-                                wTx(begin2,end2,r2,model,-1*kappa,param.eta,param.lambda,param.multiplier,param.beta,true);
+                                wTx(begin2,end2,r2,model,-1*kappa,param.eta,param.lambda,param.multiplier,param.multiplier2,param.beta,true);
 
                             }
                         }
@@ -751,9 +753,9 @@ ffm_model ffm_train_on_disk(string tr_path, string va_path, ffm_parameter param)
 
                                 ffm_float kappa = weight * lambdajk;
 
-                                wTx(begin,end,r,model,kappa,param.eta,param.lambda,param.multiplier,param.beta,true);
+                                wTx(begin,end,r,model,kappa,param.eta,param.lambda,param.multiplier,param.multiplier2,param.beta,true);
 
-                                wTx(begin2,end2,r2,model,-1*kappa,param.eta,param.lambda,param.multiplier,param.beta,true);
+                                wTx(begin2,end2,r2,model,-1*kappa,param.eta,param.lambda,param.multiplier,param.multiplier2,param.beta,true);
 
                             }
 			                if(sk-sj < 50)

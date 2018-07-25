@@ -30,7 +30,8 @@ struct ffm_model {
 struct ffm_parameter {
     ffm_float eta = 0.02; // learning rate
     ffm_float lambda = 0.002; // regularization parameter
-    ffm_float multiplier[128] = {0}; // multiplier for different field.
+    ffm_float multiplier[128] = {1}; // multiplier for different field.
+    ffm_float multiplier2[128] = {1}; // own multiplier for different field
     ffm_float beta = 1;
     ffm_int nr_iters = 15;
     ffm_float sigma = 0.5;

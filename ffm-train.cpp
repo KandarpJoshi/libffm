@@ -135,7 +135,27 @@ Option parse_option(int argc, char **argv) {
                 opt.param.multiplier[atoi(field)] = atof(multiplier);
             }
 
-        } else{
+        }else if(args[i].compare("-m2") == 0){
+            if(i == argc-1)
+                throw invalid_argument("need to specify multiplier for different field comma separated after -m2");
+            i++;
+            int len = args[i].length();
+            char value[len+1];
+            strcpy(value, args[i].c_str());
+            char* field0 = strtok(value,":");
+            char* multiplier0 = strtok(nullptr,",");
+            opt.param.multiplier2[atoi(field0)] = atof(multiplier0);
+            while (true) {
+                char* field = strtok(nullptr,":");
+                char* multiplier = strtok(nullptr,",");
+                if(field == nullptr){
+                    break;
+                }
+                opt.param.multiplier2[atoi(field)] = atof(multiplier);
+            }
+
+        }
+        else{
             break;
         }
     }
