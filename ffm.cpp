@@ -821,13 +821,9 @@ void ffm_save_txt(ffm_model &model , string path){
         std::string out;
         out.append(std::to_string(j));
         out.append("^");
-        out.append("{");
         for(ffm_int f = 0; f < model.m; f++) {
-            out.append("\"");
             out.append(std::to_string(f));
-            out.append("\"");
             out.append(":");
-            out.append("\"");
             for(ffm_int d = 0; d < k_aligned;) {
                 for(ffm_int s = 0; s < kALIGN; s++, w++, d++) {
                     out.append(std::to_string(w[0]));
@@ -836,11 +832,9 @@ void ffm_save_txt(ffm_model &model , string path){
                 w += kALIGN;
             }
             out.append("0");
-            out.append("\"");
             if(f + 1 < model.m)
-                out.append(",");
+                out.append(";");
         }
-        out.append("}");
         f_out << out << "\n";
     }
     f_out.close();
