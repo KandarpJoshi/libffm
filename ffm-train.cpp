@@ -59,6 +59,10 @@ Option parse_option(int argc, char **argv) {
         throw invalid_argument(train_help());
 
     Option opt;
+    for(int x=0;x<128;x++){
+        opt.param.multiplier[x] =1;
+        opt.param.multiplier2[x] =1;
+    }
 
     ffm_int i = 1;
     for(; i < argc; i++) {
