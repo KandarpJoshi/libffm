@@ -599,7 +599,7 @@ void ffm_read_problem_to_disk(string txt_path, string bin_path) {
     }
 }
 
-ffm_model ffm_train_on_disk(string tr_path, string va_path, ffm_parameter param) {
+ffm_model ffm_train_on_disk(string tr_path, string va_path, ffm_parameter param, ffm_double * min_val_loss) {
 
     problem_on_disk tr(tr_path);
     problem_on_disk va(va_path);
@@ -613,6 +613,7 @@ ffm_model ffm_train_on_disk(string tr_path, string va_path, ffm_parameter param)
     if(auto_stop)
         prev_W.assign(w_size, 0);
     ffm_double best_va_loss = numeric_limits<ffm_double>::max();
+    ffm_double  best_val_loss = 1e9;
 
     cout.width(4);
     cout << "iter";
@@ -791,7 +792,7 @@ ffm_model ffm_train_on_disk(string tr_path, string va_path, ffm_parameter param)
 
         if(!va.is_empty()) {
             ffm_double va_loss = one_epoch(va, false);
-
+            best_val_loss = min(best_val_loss,va_loss);
             cout.width(13);
             cout << fixed << setprecision(5) << va_loss;
 
@@ -809,7 +810,7 @@ ffm_model ffm_train_on_disk(string tr_path, string va_path, ffm_parameter param)
         cout.width(13);
         cout << fixed << setprecision(1) << timer.get() << endl;
     }
-
+    *min_val_loss = best_val_loss;
     return model;
 }
 void ffm_save_txt(ffm_model &model , string path){
@@ -897,6 +898,15 @@ ffm_float ffm_predict(ffm_node *begin, ffm_node *end, ffm_model &model) {
 
     return t;
 }
+    void copy_model(ffm_model &destModel , ffm_model &srcModel){
+        ffm_long w_size = get_w_size(srcModel);
+        destModel.n =  srcModel.n;
+        destModel.m =  srcModel.m;
+        destModel.k =  srcModel.k;
+        destModel.normalization =  srcModel.normalization;
+        cout<< "inside copy"<<endl;
+        memcpy(destModel.W, srcModel.W, w_size*sizeof(ffm_float));
+    }
 
 } // namespace ffm
 

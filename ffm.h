@@ -36,6 +36,8 @@ struct ffm_parameter {
     ffm_int nr_iters = 15;
     ffm_float sigma = 0.5;
     ffm_int k = 4; // number of latent factors
+    ffm_int try_out[128] = {0};
+    ffm_int try_out_2[128] = {0};
     bool normalization = false;
     bool auto_stop = false;
 };
@@ -48,9 +50,11 @@ void ffm_save_txt(ffm_model &model , string path);
 
 ffm_model ffm_load_model(string path);
 
-ffm_model ffm_train_on_disk(string Tr_path, string Va_path, ffm_parameter param);
+ffm_model ffm_train_on_disk(string Tr_path, string Va_path, ffm_parameter param,ffm_double * min_val_loss);
 
 ffm_float ffm_predict(ffm_node *begin, ffm_node *end, ffm_model &model);
+
+void copy_model(ffm_model &m1 , ffm_model &m2);
 
 } // namespace ffm
 

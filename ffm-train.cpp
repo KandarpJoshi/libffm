@@ -2,11 +2,12 @@
 #include <algorithm>
 #include <cstring>
 #include <iostream>
+#include <fstream>
 #include <stdexcept>
 #include <string>
 #include <vector>
 #include <cstdlib>
-
+#include <cmath>
 #include "ffm.h"
 
 #if defined USEOMP
@@ -158,6 +159,42 @@ Option parse_option(int argc, char **argv) {
                 opt.param.multiplier2[atoi(field)] = atof(multiplier);
             }
 
+        }else if(args[i].compare("-tr1") == 0) {
+            if(i == argc-1)
+                throw invalid_argument("need to specify tryouts for fields after -tr1");
+            i++;
+            int len = args[i].length();
+            char value[len+1];
+            strcpy(value, args[i].c_str());
+            char* field0 = strtok(value,":");
+            char* try0 = strtok(nullptr,",");
+            opt.param.try_out[atoi(field0)] = atoi(try0);
+            while (true) {
+                char* field = strtok(nullptr,":");
+                char* tryout = strtok(nullptr,",");
+                if(field == nullptr){
+                    break;
+                }
+                opt.param.try_out[atoi(field)] = atoi(tryout);
+            }
+        }else if(args[i].compare("-tr2") == 0) {
+            if(i == argc-1)
+                throw invalid_argument("need to specify tryouts for fields after -tr2");
+            i++;
+            int len = args[i].length();
+            char value[len+1];
+            strcpy(value, args[i].c_str());
+            char* field0 = strtok(value,":");
+            char* try0 = strtok(nullptr,",");
+            opt.param.try_out_2[atoi(field0)] = atoi(try0);
+            while (true) {
+                char* field = strtok(nullptr,":");
+                char* tryout = strtok(nullptr,",");
+                if(field == nullptr){
+                    break;
+                }
+                opt.param.try_out_2[atoi(field)] = atoi(tryout);
+            }
         }
         else{
             break;
@@ -180,6 +217,20 @@ Option parse_option(int argc, char **argv) {
 
     return opt;
 }
+void save_best_params(ffm_float best_m1[128], ffm_float best_m2[128] , string path){
+    std::ofstream f_out(path);
+    std::string out;
+    f_out << "best_m1 \n";
+    for(int i=0;i<10;i++){
+        f_out << best_m1[i]<<" ";
+    }
+    f_out << "\n best_m2 \n";
+    for(int i=0;i<10;i++){
+        f_out << best_m2[i]<<" ";
+    }
+    fout<<"\n";
+    f_out.close();
+}
 
 int train_on_disk(Option opt) {
     string tr_bin_path = basename(opt.tr_path) + ".bin";
@@ -189,10 +240,43 @@ int train_on_disk(Option opt) {
     if(!opt.va_path.empty())
         ffm_read_problem_to_disk(opt.va_path, va_bin_path);
 
-    ffm_model model = ffm_train_on_disk(tr_bin_path.c_str(), va_bin_path.c_str(), opt.param);
 
-    ffm_save_model(model, opt.model_path);
-    ffm_save_txt(model, opt.model_path+".txt");
+    ffm_double min_val_loss = 1e9;
+    ffm_model best_model = ffm_train_on_disk(tr_bin_path.c_str(), va_bin_path.c_str(), opt.param, &min_val_loss);
+    ffm_float best_m1[128];
+    ffm_float best_m2[128];
+    for(int i=0;i<128;i++){
+        best_m1[i] = opt.param.multiplier[i];
+        best_m2[i] = opt.param.multiplier2[i];
+    }
+
+    for(int i=0;i<5;i++) {
+        for(int j=0;j<5;j++) {
+            for (int k = - opt.param.try_out[i]; k < opt.param.try_out[i]; k++) {
+                for(int l= -opt.param.try_out_2[j]; l<opt.param.try_out_2[j]; l++) {
+                    ffm_double current_loss = 1e9;
+                    opt.param.multiplier[i] = opt.param.multiplier[i] * pow(2,k);
+                    opt.param.multiplier2[j] = opt.param.multiplier2[j] * pow(2,l);
+                    ffm_model model = ffm_train_on_disk(tr_bin_path.c_str(), va_bin_path.c_str(), opt.param, &current_loss);
+
+                    if(current_loss < min_val_loss){
+                        copy_model(best_model,model);
+                        min_val_loss = current_loss;
+                        best_m1[i] = opt.param.multiplier[i];
+                        best_m2[j] = opt.param.multiplier2[j];
+                    }
+                    opt.param.multiplier[i] = opt.param.multiplier[i] * pow(2,-k);
+                    opt.param.multiplier2[j] = opt.param.multiplier2[j] * pow(2,-l);
+
+                }
+            }
+        }
+    }
+    cout<< min_val_loss<<" hi  there "<< endl;
+    ffm_save_model(best_model, opt.model_path);
+    ffm_save_txt(best_model, opt.model_path+".txt");
+    save_best_params(best_m1,best_m2,opt.model_path+".best_param");
+
     return 0;
 }
 
